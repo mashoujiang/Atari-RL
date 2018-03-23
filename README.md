@@ -6,6 +6,7 @@ play atari game with reinforcement learning
 
 ## Dependance
 * numpy
+* pandas
 * gym
 * tensorflow
 * moviepy
