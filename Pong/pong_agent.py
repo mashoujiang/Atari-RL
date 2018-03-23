@@ -204,7 +204,7 @@ def main():
         agent.train()
 
         clip = mpy.VideoClip(agent.make_frame, duration=100)
-        clip.write_gif("Pong.gif", fps=15)
+        clip.write_gif("./figures/Pong.gif", fps=15)
 
 
 if __name__ == '__main__':
