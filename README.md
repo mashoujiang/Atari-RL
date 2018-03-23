@@ -8,3 +8,4 @@ play atari game with reinforcement learning
 * numpy
 * gym
 * tensorflow
+* moviepy
