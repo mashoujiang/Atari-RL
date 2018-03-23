@@ -6,7 +6,9 @@ import os
 import time
 
 import gym
+import moviepy.editor as mpy
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 
 n_units = 200
@@ -15,11 +17,12 @@ gamma = 0.99
 RANDOM_SEED = 2018
 RENDER_THRESHOLD = 0
 SAVE_INTERVAL = 10
-MAX_EPOCH = 1000
+MAX_EPOCH = 2000
 MODEL_DIR = './results/'
+LOG_FILE = './results/log.csv'
 env = gym.make("Pong-v0")
-# nn_model = './results/save.ckpt'
-nn_model = None
+nn_model = './results/save.ckpt'
+# nn_model = None
 
 
 class PongAgent(object):
@@ -33,10 +36,18 @@ class PongAgent(object):
         self.running_reward = None
         self.cur_x = None
         self.prev_x = None
-        self.render = True
+        self.render = False  # True
         self.s_dim = 80 * 80
+        self.statistic = {'reward_sum': [], 'running_reward': []}
         self.sess = sess
         self.observation = env.reset()
+        self.build_graph_op()
+        init = tf.global_variables_initializer()
+        self.sess.run(init)
+        self.saver = tf.train.Saver()
+        if nn_model is not None:
+            self.saver.restore(self.sess, nn_model)
+            print("model restored")
 
     def build_net(self):
         with tf.variable_scope('build_net'):
@@ -64,14 +75,6 @@ class PongAgent(object):
 
     def train(self):
         start = time.time()
-        self.build_graph_op()
-        init = tf.global_variables_initializer()
-        self.sess.run(init)
-
-        self.saver = tf.train.Saver()
-        if nn_model is not None:
-            self.saver.restore(self.sess, nn_model)
-            print("model restored")
 
         while self.epoch_number < MAX_EPOCH:
             self.play_one_epoch()
@@ -80,6 +83,8 @@ class PongAgent(object):
                 self.saver.save(self.sess, MODEL_DIR + "save.ckpt")
                 print("model saved.")
 
+        df = pd.DataFrame(self.statistic)
+        df.to_csv(LOG_FILE, encoding='utf-8')
         print("Train over, {} epoch total spend {} minutes".format(MAX_EPOCH, round((time.time() - start) / 60, 2)))
 
     def play_one_epoch(self):
@@ -155,6 +160,10 @@ class PongAgent(object):
         reward_sum = np.sum(self.r_batch)
         self.running_reward = reward_sum if self.running_reward is None else self.running_reward * 0.95 + reward_sum * 0.05
         print("resetting evn. episode reward total was %f. running mean: %f." % (reward_sum, self.running_reward))
+
+        self.statistic['reward_sum'].append(reward_sum)
+        self.statistic['running_reward'].append(self.running_reward)
+
         if self.running_reward > RENDER_THRESHOLD:
             self.render = True
 
@@ -167,6 +176,22 @@ class PongAgent(object):
     def sigmoid(self, x):
         return 1.0 / (1.0 + np.exp(-x))
 
+    def make_frame(self, t):
+        new_frame = env.render(mode='rgb_array')
+        new_frame[0][:8] = new_frame[0][8]
+
+        self.cur_x = self.preprocess(self.observation)
+        state = self.cur_x - self.prev_x if self.prev_x is not None else np.zeros(self.s_dim)
+        self.prev_x = self.cur_x
+
+        aprob = self.sigmoid(self.sess.run(self.out, feed_dict={self.inputs: np.reshape(state, (1, self.s_dim))}))
+        action = 2 if np.random.uniform() < aprob else 3
+
+        # step the environment
+        self.observation, reward, done, info = env.step(action)
+
+        return new_frame
+
 
 def main():
     with tf.Session() as sess:
@@ -177,6 +202,9 @@ def main():
 
         agent = PongAgent(sess)
         agent.train()
+
+        clip = mpy.VideoClip(agent.make_frame, duration=100)
+        clip.write_gif("Pong.gif", fps=15)
 
 
 if __name__ == '__main__':
