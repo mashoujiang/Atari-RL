@@ -15,9 +15,9 @@ n_units = 200
 learning_rate = 1e-3
 gamma = 0.99
 RANDOM_SEED = 2018
-RENDER_THRESHOLD = 0
+RENDER_THRESHOLD = 10
 SAVE_INTERVAL = 10
-MAX_EPOCH = 2000
+MAX_EPOCH = 3000
 MODEL_DIR = './results/'
 LOG_FILE = './results/log.csv'
 env = gym.make("Pong-v0")
@@ -203,6 +203,7 @@ def main():
         agent = PongAgent(sess)
         agent.train()
 
+        agent.observation = env.reset()
         clip = mpy.VideoClip(agent.make_frame, duration=100)
         clip.write_gif("./figures/Pong.gif", fps=15)
 
